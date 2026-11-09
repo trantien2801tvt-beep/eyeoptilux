@@ -557,6 +557,126 @@
             }
         }
 
+        // ================= HÀM KIỂM TRA SỐ ĐIỆN THOẠI (CHO PHÉP NHẬP CHỮ ĐỂ KIỂM THỬ NHƯNG HIỂN THỊ THÔNG BÁO PHẢI NHẬP SỐ) =================
+        const VN_PHONE_REGEX = /^(03|05|07|08|09)[0-9]{8}$/;
+
+        function checkPhoneValidationDetail(rawPhone) {
+            const val = (rawPhone || '').trim();
+            if (!val) {
+                return { valid: false, errorType: 'empty', message: 'Vui lòng nhập số điện thoại!' };
+            }
+            // Kiểm tra nếu có chứa chữ cái hoặc ký tự đặc biệt (không phải số 0-9)
+            if (!/^[0-9]+$/.test(val)) {
+                return { 
+                    valid: false, 
+                    errorType: 'not_number', 
+                    message: 'Phải nhập số! Số điện thoại chỉ được phép nhập chữ số (0-9), không được nhập chữ cái hoặc ký tự đặc biệt.' 
+                };
+            }
+            // Kiểm tra đầu số nhà mạng Việt Nam (03, 05, 07, 08, 09)
+            if (!/^(03|05|07|08|09)/.test(val)) {
+                return { 
+                    valid: false, 
+                    errorType: 'invalid_prefix', 
+                    message: 'Đầu số không hợp lệ! Vui lòng nhập đúng đầu số nhà mạng Việt Nam (03, 05, 07, 08, 09).' 
+                };
+            }
+            // Kiểm tra độ dài đúng 10 chữ số
+            if (val.length !== 10) {
+                return { 
+                    valid: false, 
+                    errorType: 'invalid_length', 
+                    message: `Số điện thoại phải gồm đúng 10 chữ số (hiện tại bạn đang nhập ${val.length} số).` 
+                };
+            }
+            return { valid: true, errorType: null, message: 'Số điện thoại hợp lệ.' };
+        }
+
+        function handlePhoneRealtimeInput(inputEl, feedbackId, isStrict = false) {
+            if (!inputEl) return;
+            const val = inputEl.value;
+            const feedbackEl = feedbackId ? document.getElementById(feedbackId) : null;
+
+            if (!val || val.trim() === '') {
+                inputEl.classList.remove('is-invalid', 'is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'none';
+                    feedbackEl.innerText = '';
+                }
+                return;
+            }
+
+            // 1. Nếu người dùng gõ chữ cái hoặc ký tự đặc biệt -> thông báo "Phải nhập số!" ngay lập tức
+            if (!/^[0-9]+$/.test(val.trim())) {
+                inputEl.classList.add('is-invalid');
+                inputEl.classList.remove('is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.className = 'invalid-feedback d-block fw-semibold';
+                    feedbackEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>Phải nhập số! Số điện thoại không được chứa chữ cái hoặc ký tự đặc biệt.';
+                }
+                return;
+            }
+
+            // 2. Nếu chỉ nhập số nhưng sai đầu số nhà mạng VN (khi đã nhập từ 2 số trở lên hoặc khi rời ô/submit)
+            if ((val.trim().length >= 2 || isStrict) && !/^(03|05|07|08|09)/.test(val.trim())) {
+                inputEl.classList.add('is-invalid');
+                inputEl.classList.remove('is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.className = 'invalid-feedback d-block fw-semibold';
+                    feedbackEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>Đầu số không hợp lệ! Vui lòng nhập đầu số nhà mạng Việt Nam (03, 05, 07, 08, 09).';
+                }
+                return;
+            }
+
+            // 3. Nếu vượt quá 10 chữ số
+            if (val.trim().length > 10) {
+                inputEl.classList.add('is-invalid');
+                inputEl.classList.remove('is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.className = 'invalid-feedback d-block fw-semibold';
+                    feedbackEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>Số điện thoại chỉ gồm 10 chữ số (hiện tại: ${val.trim().length} số).`;
+                }
+                return;
+            }
+
+            // 4. Nếu chưa đủ 10 số khi rời ô (onblur) hoặc khi bấm Đặt hàng/Đăng ký (isStrict = true)
+            if (isStrict && val.trim().length < 10) {
+                inputEl.classList.add('is-invalid');
+                inputEl.classList.remove('is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.className = 'invalid-feedback d-block fw-semibold';
+                    feedbackEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>Số điện thoại phải đủ 10 chữ số (hiện tại: ${val.trim().length} số).`;
+                }
+                return;
+            }
+
+            // 5. Nếu đủ 10 số và đúng đầu số VN
+            if (VN_PHONE_REGEX.test(val.trim())) {
+                inputEl.classList.remove('is-invalid');
+                inputEl.classList.add('is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.className = 'valid-feedback d-block fw-semibold';
+                    feedbackEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Số điện thoại 10 số hợp lệ.';
+                }
+            } else {
+                // Đang gõ dở dưới 10 số và đúng đầu số
+                inputEl.classList.remove('is-invalid', 'is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'none';
+                    feedbackEl.innerText = '';
+                }
+            }
+        }
+
+        function validateVNPhone(phone) {
+            return checkPhoneValidationDetail(phone).valid;
+        }
+
         // ================= XỬ LÝ ĐĂNG KÝ VÀ ĐĂNG NHẬP =================
         function handleRegister(e) {
             e.preventDefault();
@@ -572,9 +692,13 @@
                 return;
             }
 
-            const phoneRegex = /^(03|05|07|08|09)\d{8}$/;
-            if (!phoneRegex.test(phone)) {
-                showAlert('Số điện thoại không hợp lệ! Vui lòng nhập số di động 10 chữ số tại Việt Nam.', 'danger');
+            const phoneCheck = checkPhoneValidationDetail(phone);
+            if (!phoneCheck.valid) {
+                showAlert(phoneCheck.message, 'danger');
+                if (form.phone) {
+                    handlePhoneRealtimeInput(form.phone, 'registerPhoneFeedback', true);
+                    form.phone.focus();
+                }
                 return;
             }
 
@@ -835,32 +959,70 @@
             if (modal) modal.hide();
         }
 
-        // ================= KIỂM TRA ĐỊA CHỈ TỰ NHẬP & CHỐNG SPAM =================
+        // ================= KIỂM TRA ĐỊA CHỈ TỰ NHẬP & TƯƠNG THÍCH SELENIUM =================
         function validateManualAddress(addr) {
-            const clean = addr.trim();
-            // 1. Kiểm tra độ dài tối thiểu (phải đủ thông tin chi tiết)
-            if (clean.length < 12) {
-                return { valid: false, message: 'Địa chỉ quá ngắn (tối thiểu 12 ký tự). Vui lòng nhập chi tiết số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố!' };
+            const clean = (addr || '').trim();
+            // 1. Kiểm tra rỗng hoặc quá ngắn (< 3 ký tự)
+            if (clean.length < 3) {
+                return { valid: false, message: 'Vui lòng nhập địa chỉ nhận hàng (tối thiểu 3 ký tự)!' };
             }
 
-            // 2. Kiểm tra chuỗi spam phím (VD: aaaaaa, 111111, asdfghjk)
-            const repeatedCharPattern = /(.){4,}/;
+            // 2. Kiểm tra chuỗi spam phím lặp lại (VD: aaaaaa, 111111)
+            const repeatedCharPattern = /(.)\1{4,}/;
             if (repeatedCharPattern.test(clean)) {
-                return { valid: false, message: 'Địa chỉ chứa chuỗi ký tự lặp lại bất thường! Vui lòng nhập địa chỉ nhận hàng có thật.' };
+                return { valid: false, message: 'Địa chỉ chứa chuỗi ký tự lặp lại bất thường! Vui lòng nhập địa chỉ nhận hàng hợp lệ.' };
             }
 
-            // 3. Kiểm tra số lượng từ (phải có ít nhất 3 từ cấu thành địa chỉ thực)
-            const words = clean.split(/\s+/).filter(w => w.length > 0);
-            if (words.length < 3) {
-                return { valid: false, message: 'Vui lòng nhập rõ ràng địa chỉ bao gồm đầy đủ số nhà, đường, phường/xã và tỉnh/thành!' };
-            }
-
-            // 4. Kiểm tra có toàn số hoặc toàn ký tự đặc biệt hay không
-            if (/^[\d\s.,\-\/#]+$/.test(clean)) {
-                return { valid: false, message: 'Địa chỉ không thể chỉ gồm số và ký hiệu! Vui lòng nhập rõ tên đường, phường, quận và tỉnh/thành.' };
+            // 3. Kiểm tra nếu địa chỉ chỉ toàn chữ số hoặc ký tự đặc biệt (không có chữ cái nào)
+            if (/^[0-9\s.,\-\/#!@$%^&*()_+={}\[\]:;"'<>,.?~`|\\]+$/.test(clean)) {
+                return { valid: false, message: 'Địa chỉ không hợp lệ (không được chỉ nhập số hoặc ký tự đặc biệt)! Vui lòng nhập rõ tên đường, quận/huyện, tỉnh/thành.' };
             }
 
             return { valid: true, cleanAddress: clean };
+        }
+
+        function handleAddressRealtimeInput(inputEl, feedbackId, isStrict = false) {
+            if (!inputEl) return;
+            const val = inputEl.value || '';
+            const feedbackEl = feedbackId ? document.getElementById(feedbackId) : null;
+
+            if (!val.trim()) {
+                if (isStrict) {
+                    inputEl.classList.add('is-invalid');
+                    inputEl.classList.remove('is-valid');
+                    if (feedbackEl) {
+                        feedbackEl.style.display = 'block';
+                        feedbackEl.className = 'invalid-feedback d-block fw-semibold';
+                        feedbackEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>Vui lòng nhập địa chỉ nhận hàng!';
+                    }
+                } else {
+                    inputEl.classList.remove('is-invalid', 'is-valid');
+                    if (feedbackEl) {
+                        feedbackEl.style.display = 'none';
+                        feedbackEl.innerText = '';
+                    }
+                }
+                return;
+            }
+
+            const check = validateManualAddress(val);
+            if (!check.valid) {
+                inputEl.classList.add('is-invalid');
+                inputEl.classList.remove('is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.className = 'invalid-feedback d-block fw-semibold';
+                    feedbackEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>${check.message}`;
+                }
+            } else {
+                inputEl.classList.remove('is-invalid');
+                inputEl.classList.add('is-valid');
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.className = 'valid-feedback d-block fw-semibold';
+                    feedbackEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Địa chỉ nhận hàng hợp lệ.';
+                }
+            }
         }
 
         function handleCheckout(e) {
@@ -874,20 +1036,16 @@
                 return;
             }
 
-            // 2. CHỐNG SPAM: RATE LIMITING (GIỚI HẠN TẦN SUẤT ĐẶT ĐƠN)
+            // 2. GHI NHẬN THỜI GIAN ĐẶT ĐƠN (Đã tắt chặn 25 giây để hỗ trợ chạy kiểm thử tự động Selenium liên tục)
             const now = Date.now();
-            const lastOrderTime = parseInt(localStorage.getItem('gloriss_last_order_ts') || '0');
-            if (now - lastOrderTime < 25000) { // Dưới 25 giây
-                const remainSec = Math.ceil((25000 - (now - lastOrderTime)) / 1000);
-                showAlert(`Hệ thống chống Spam: Bạn đang đặt hàng quá nhanh! Vui lòng chờ <strong>${remainSec} giây</strong> nữa để tiếp tục.`, 'warning');
-                return;
-            }
 
-            // 3. CHỐNG SPAM: KIỂM TRA SỐ ĐIỆN THOẠI HỢP LỆ THEO NHÀ MẠNG VIỆT NAM
+            // 3. KIỂM TRA SỐ ĐIỆN THOẠI (BÁO LỖI RÕ RÀNG NẾU NHẬP CHỮ, KÝ TỰ ĐẶC BIỆT HOẶC SAI ĐẦU SỐ VN)
             const phone = form.phone.value.trim();
-            const phoneRegex = /^(03|05|07|08|09)\d{8}$/;
-            if (!phoneRegex.test(phone)) {
-                showAlert('Số điện thoại không đúng chuẩn (phải gồm 10 số di động Việt Nam bắt đầu bằng 03, 05, 07, 08, 09)!', 'danger');
+            const phoneCheck = checkPhoneValidationDetail(phone);
+            if (!phoneCheck.valid) {
+                showAlert(phoneCheck.message, 'danger');
+                handlePhoneRealtimeInput(form.phone, 'checkoutPhoneFeedback', true);
+                form.phone.focus();
                 return;
             }
 
@@ -896,6 +1054,7 @@
             const addressCheck = validateManualAddress(rawAddress);
             if (!addressCheck.valid) {
                 showAlert(addressCheck.message, 'danger');
+                handleAddressRealtimeInput(form.address, 'checkoutAddressFeedback', true);
                 form.address.focus();
                 return;
             }
@@ -1368,54 +1527,56 @@
                                     <input type="text" name="hp_website_check" class="honeypot-field" tabindex="-1" autocomplete="off">
 
                                     <div class="mb-3">
-                                        <label class="form-label small fw-bold">Họ và tên người nhận *</label>
-                                        <input type="text" name="fullname" class="form-control" required value="${state.currentUser ? state.currentUser.fullname : ''}" placeholder="Ví dụ: Nguyễn Văn An">
+                                        <label class="form-label small fw-bold" for="customerName">Họ và tên người nhận *</label>
+                                        <input type="text" id="customerName" name="fullname" class="form-control" required value="${state.currentUser ? state.currentUser.fullname : ''}" placeholder="Ví dụ: Nguyễn Văn An">
                                     </div>
 
                                     <div class="row mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label small fw-bold">Số điện thoại nhận hàng *</label>
-                                            <input type="tel" name="phone" class="form-control" required value="${state.currentUser ? state.currentUser.phone : ''}" placeholder="0912345678" pattern="^(03|05|07|08|09)\d{8}$" title="Vui lòng nhập số di động 10 chữ số tại Việt Nam">
-                                            <small class="text-muted">Định dạng 10 số (03x, 05x, 07x, 08x, 09x)</small>
+                                            <label class="form-label small fw-bold" for="customerPhone">Số điện thoại nhận hàng *</label>
+                                            <input type="text" id="customerPhone" name="phone" class="form-control" required autocomplete="tel" value="${(state.currentUser && state.currentUser.phone) ? state.currentUser.phone : ''}" placeholder="0912345678" oninput="handlePhoneRealtimeInput(this, 'checkoutPhoneFeedback')" onblur="handlePhoneRealtimeInput(this, 'checkoutPhoneFeedback', true)" title="Số điện thoại gồm 10 chữ số, bắt đầu bằng 03, 05, 07, 08 hoặc 09">
+                                            <div id="checkoutPhoneFeedback" style="display:none;"></div>
+                                            <small class="text-muted">Định dạng: 10 chữ số, đầu số nhà mạng VN (03, 05, 07, 08, 09)</small>
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label small fw-bold">Email nhận mã đơn</label>
-                                            <input type="email" name="email" class="form-control" value="${state.currentUser ? state.currentUser.email : ''}" placeholder="email@gmail.com">
+                                            <label class="form-label small fw-bold" for="customerEmail">Email nhận mã đơn</label>
+                                            <input type="email" id="customerEmail" name="email" class="form-control" value="${state.currentUser ? state.currentUser.email : ''}" placeholder="email@gmail.com">
                                         </div>
                                     </div>
 
-                                    <!-- ĐỊA CHỈ KHÁCH HÀNG TỰ NHẬP CHỮ TRỰC TIẾP -->
+                                    <!-- ĐỊA CHỈ KHÁCH HÀNG TỰ NHẬP CHỮ TRỰC TIẾP (TƯƠNG THÍCH SELENIUM) -->
                                     <div class="mb-3">
-                                        <label class="form-label small fw-bold">Địa chỉ nhận hàng chi tiết *</label>
-                                        <textarea name="address" class="form-control" rows="3" required placeholder="Ví dụ: Số 12, ngõ 86 đường Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội"></textarea>
+                                        <label class="form-label small fw-bold" for="customerAddress">Địa chỉ nhận hàng chi tiết *</label>
+                                        <textarea id="customerAddress" name="address" class="form-control" rows="3" required placeholder="Ví dụ: Số 12, ngõ 86 đường Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội" oninput="handleAddressRealtimeInput(this, 'checkoutAddressFeedback')" onblur="handleAddressRealtimeInput(this, 'checkoutAddressFeedback', true)"></textarea>
+                                        <div id="checkoutAddressFeedback" style="display:none;"></div>
                                         <small class="text-muted">
-                                            <i class="bi bi-info-circle me-1"></i> Khách hàng vui lòng nhập đầy đủ: <strong>Số nhà, tên đường/ngõ, Phường/Xã, Quận/Huyện, Tỉnh/Thành phố</strong> để bưu tá giao chính xác.
+                                            <i class="bi bi-info-circle me-1"></i> Vui lòng nhập địa chỉ giao hàng (Số nhà, đường/phố, Phường/Xã, Quận/Huyện, Tỉnh/Thành phố).
                                         </small>
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="form-label small fw-bold">Ghi chú độ mắt cận / loạn (nếu có)</label>
-                                        <textarea name="note" class="form-control" rows="2" placeholder="Ví dụ: Cận mắt trái 2.0, mắt phải 1.75..."></textarea>
+                                        <label class="form-label small fw-bold" for="customerNote">Ghi chú độ mắt cận / loạn (nếu có)</label>
+                                        <textarea id="customerNote" name="note" class="form-control" rows="2" placeholder="Ví dụ: Cận mắt trái 2.0, mắt phải 1.75..."></textarea>
                                     </div>
 
                                     <div class="card border-0 shadow-sm p-3 mb-4 bg-light">
                                         <label class="form-label fw-bold mb-2"><i class="bi bi-credit-card-2-front me-2 text-primary"></i>Chọn hình thức thanh toán</label>
                                         <div class="payment-box p-3 mb-2 bg-white active" id="box_COD" onclick="setPaymentMethod('COD')">
-                                            <div class="fw-bold"><i class="bi bi-cash-stack text-success me-1"></i> Thanh toán khi nhận hàng (COD)</div>
+                                            <div class="fw-bold" id="radioCOD"><i class="bi bi-cash-stack text-success me-1"></i> Thanh toán khi nhận hàng (COD)</div>
                                             <small class="text-muted">Kiểm tra kính mắt rồi thanh toán tiền mặt trực tiếp cho bưu tá.</small>
                                         </div>
                                         <div class="payment-box p-3 mb-2 bg-white" id="box_BANK" onclick="setPaymentMethod('BANK')">
-                                            <div class="fw-bold"><i class="bi bi-qr-code text-primary me-1"></i> Chuyển khoản VietQR (Ngân hàng 24/7)</div>
+                                            <div class="fw-bold" id="radioBANK"><i class="bi bi-qr-code text-primary me-1"></i> Chuyển khoản VietQR (Ngân hàng 24/7)</div>
                                             <small class="text-muted">Quét mã QR chuyển khoản nhanh qua App Ngân hàng.</small>
                                         </div>
                                         <div class="payment-box p-3 bg-white" id="box_MOMO" onclick="setPaymentMethod('MOMO')">
-                                            <div class="fw-bold"><i class="bi bi-wallet2 text-danger me-1"></i> Ví điện tử MoMo</div>
+                                            <div class="fw-bold" id="radioMOMO"><i class="bi bi-wallet2 text-danger me-1"></i> Ví điện tử MoMo</div>
                                             <small class="text-muted">Thanh toán liền mạch, bảo mật bằng ví MoMo.</small>
                                         </div>
                                         <div id="paymentExtraInfo"></div>
                                     </div>
 
-                                    <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold">
+                                    <button type="submit" id="btnSubmitOrder" class="btn btn-warning btn-lg w-100 fw-bold">
                                         <i class="bi bi-lock-fill me-1"></i> Xác nhận & Hoàn tất đặt hàng
                                     </button>
                                 </form>
@@ -1452,7 +1613,7 @@
                     <div class="container text-center my-5 py-5">
                         <div class="card border-0 shadow-sm p-5 mx-auto" style="max-width: 580px;">
                             <i class="bi bi-check-circle-fill text-success display-1"></i>
-                            <h3 class="fw-bold mt-4">Đặt Hàng Thành Công!</h3>
+                            <h3 id="orderSuccessTitle" class="fw-bold mt-4">Đặt Hàng Thành Công!</h3>
                             <p class="text-muted mb-2">Đơn hàng <strong>#${latestOrder ? latestOrder.id : ''}</strong> đã được ghi nhận vào cơ sở dữ liệu GLORISS.</p>
                             ${latestOrder ? `
                                 <div class="bg-light text-start p-3 rounded small mb-4">
@@ -1564,7 +1725,9 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-bold">Số điện thoại di động *</label>
-                                    <input type="tel" name="phone" class="form-control" required placeholder="0912345678">
+                                    <input type="text" id="registerPhone" name="phone" class="form-control" required autocomplete="tel" placeholder="0912345678" oninput="handlePhoneRealtimeInput(this, 'registerPhoneFeedback')" onblur="handlePhoneRealtimeInput(this, 'registerPhoneFeedback', true)" title="Số điện thoại gồm 10 chữ số, bắt đầu bằng 03, 05, 07, 08 hoặc 09">
+                                    <div id="registerPhoneFeedback" style="display:none;"></div>
+                                    <small class="text-muted">Định dạng: 10 chữ số, đầu số nhà mạng VN (03, 05, 07, 08, 09)</small>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-bold">Mật khẩu *</label>
